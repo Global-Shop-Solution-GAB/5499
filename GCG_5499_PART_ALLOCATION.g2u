@@ -1,0 +1,602 @@
+Program.Sub.ScreenSU.Start
+Gui.FormPartAlloc..Create
+Gui.FormPartAlloc..Caption("Part Alocation")
+Gui.FormPartAlloc..Size(15315,10755)
+Gui.FormPartAlloc..MinX(0)
+Gui.FormPartAlloc..MinY(0)
+Gui.FormPartAlloc..Position(0,0)
+Gui.FormPartAlloc..BackColor(-2147483633)
+Gui.FormPartAlloc..MousePointer(0)
+Gui.FormPartAlloc..Event(UnLoad,FormPartAlloc_UnLoad)
+Gui.FormPartAlloc.GsGridControlPartAlloc.Create(GsGridControl)
+Gui.FormPartAlloc.GsGridControlPartAlloc.Size(14985,9060)
+Gui.FormPartAlloc.GsGridControlPartAlloc.Position(105,690)
+Gui.FormPartAlloc.GsGridControlPartAlloc.Event(RowCellClick,GsGridControlPartAlloc_RowCellClick)
+Gui.FormPartAlloc.GsGridControlPartAlloc.Anchor(15)
+Gui.FormPartAlloc.txtPart.Create(TextBox,"",True,2130,300,0,105,330,True,0,"Arial",8,-2147483643,1)
+Gui.FormPartAlloc.txtPart.Event(LostFocus,txtPart_LostFocus_Filter_Grid)
+Gui.FormPartAlloc.lblPart.Create(Label,"Part",True,1725,255,0,105,90,True,0,"Arial",8,-2147483633,0)
+Gui.FormPartAlloc.lblLot.Create(Label,"Lot",True,1935,255,0,2805,90,True,0,"Arial",8,-2147483633,0)
+Gui.FormPartAlloc.txtLot.Create(TextBox,"",True,1230,300,0,2805,330,True,0,"Arial",8,-2147483643,1)
+Gui.FormPartAlloc.txtLot.Event(LostFocus,txtLot_LostFocus_Filter_Grid)
+Gui.FormPartAlloc.cmdSearch.Create(Button)
+Gui.FormPartAlloc.cmdSearch.Size(450,375)
+Gui.FormPartAlloc.cmdSearch.Position(2295,300)
+Gui.FormPartAlloc.cmdSearch.Caption("^")
+Gui.FormPartAlloc.cmdSearch.Event(Click,cmdSearch_Click)
+Gui.FormPartAlloc.cmdAllocate.Create(Button)
+Gui.FormPartAlloc.cmdAllocate.Size(855,375)
+Gui.FormPartAlloc.cmdAllocate.Position(105,9990)
+Gui.FormPartAlloc.cmdAllocate.Caption("Allocate")
+Gui.FormPartAlloc.cmdAllocate.Event(Click,cmdAllocate_Click)
+Gui.FormPartAlloc.cmdAllocate.Anchor(6)
+Gui.FormPartAlloc.cmdExport.Create(Button)
+Gui.FormPartAlloc.cmdExport.Size(1470,375)
+Gui.FormPartAlloc.cmdExport.Position(13620,9975)
+Gui.FormPartAlloc.cmdExport.Anchor(10)
+Gui.FormPartAlloc.cmdExport.Caption("Export to Excel")
+Gui.FormPartAlloc.cmdExport.Event(Click,cmdExport_Click)
+Gui.FormPartAlloc.lblNote.Create(Label,"**Right Click on Row to Un-Allocate.",True,2805,255,0,12285,90,True,0,"Arial",8,-2147483633,0)
+Gui.FormPartAlloc.lblNote.Anchor(9)
+Program.Sub.ScreenSU.End
+
+Program.Sub.Preflight.Start
+V.Global.sAlloc.Declare(String,"")
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+F.Intrinsic.Control.Try
+	V.Local.sError.Declare(String,"")
+	V.Local.sRet.Declare(String,"")
+	V.Local.sSql.Declare(String,"")
+	
+	'OPENING CONNECTION TO THEIR COMPANY TABLES
+	F.ODBC.Connection!Con.OpenCompanyConnection
+	
+	F.Global.General.ReadOption("401187",3,0,V.Local.sRet)
+	
+	F.Intrinsic.Control.SelectCase(V.Local.sRet.Long)
+		F.Intrinsic.Control.Case(1)
+			V.Local.sRet.Set("Lot")
+			
+		F.Intrinsic.Control.Case(2)
+			V.Local.sRet.Set("Heat")
+			
+		F.Intrinsic.Control.Case(3)
+			V.Local.sRet.Set("Serial_Number")
+		
+	F.Intrinsic.Control.EndSelect
+	
+	Gui.FormPartAlloc.lblLot.Caption(V.Local.sRet)
+	
+	V.Global.sAlloc.Set(V.Local.sRet.Trim)
+	
+	'CREATING A DATATABLE WITH THE FILTERS
+	F.Intrinsic.String.Build("Select rtrim(Part) as Part, rtrim(Lot) as Lot, Bin, Heat, Serial_Number, Quantity, Allocated, Alloc_Type, If(Alloc_Type = 'U','User',If(Alloc_Type = 'S','Sales Order',IF(Alloc_Type = 'W','Work Order',IF(Alloc_Type = 'C','Customer','')))) as Allocation, {0} as Allocation_Value, If(Allocated = 'Y',Quantity,0) as Allocation_Qty From V_Item_Master Where Quantity > 0 and Alloc_Type <> 'T' Order By Part,Lot",V.Local.sRet,V.Local.sSql)
+	F.Data.DataTable.CreateFromSQL("ItemMaster","con",V.Local.sSql,True)
+	F.Data.DataView.Create("ItemMaster","VItemMaster")
+	
+	'CALLING THE GRID PROPERTIES
+	F.Intrinsic.Control.CallSub(Set_Properities)
+	
+	'DISPLAYING THE FORM
+	Gui.FormPartAlloc..Show
+	
+	F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.String.Build("Project: {1}{0}Subroutine: {2} Error: {3} with Description {4}","LK_PART_ALLOCATION_MOCKUP.g2u", v.Ambient.CurrentSubroutine, v.Ambient.ErrorNumber, v.Ambient.ErrorDescription, v.Local.sError)
+	F.Intrinsic.UI.Msgbox(v.Local.sError)
+	F.Intrinsic.Control.CallSub(FormPartAlloc_UnLoad)
+F.Intrinsic.Control.EndTry
+
+Program.Sub.Main.End
+
+Program.Sub.FormPartAlloc_UnLoad.Start
+F.Intrinsic.Control.Try
+	V.Local.sError.Declare(String,"")
+	
+	'CLOSING THE CONNECTION AND THE FORM
+	F.ODBC.Connection!Con.Close
+	F.Intrinsic.Control.end
+	
+	F.Intrinsic.Control.ExitSub
+	
+F.Intrinsic.Control.Catch
+	F.Intrinsic.String.Build("Project: {1}{0}Subroutine: {2} Error: {3} with Description {4}","LK_PART_ALLOCATION_MOCKUP.g2u", v.Ambient.CurrentSubroutine, v.Ambient.ErrorNumber, v.Ambient.ErrorDescription, v.Local.sError)
+	F.Intrinsic.UI.Msgbox(v.Local.sError)
+	F.Intrinsic.Control.CallSub(FormPartAlloc_UnLoad)
+F.Intrinsic.Control.EndTry
+Program.Sub.FormPartAlloc_UnLoad.End
+
+'FILTERS THE MOMENT THE PART TEXT BOX LOOSES FOCUS
+Program.Sub.txtPart_LostFocus_Filter_Grid.Start
+F.Intrinsic.Control.Try
+	V.Local.sError.Declare(String,"")
+	V.Local.sFilter.Declare(String,"")
+	V.Local.sPart.Declare(String,"")
+	V.Local.sLot.Declare(String,"")
+	
+	V.Local.sPart.Set(V.Screen.FormPartAlloc!txtPart.Text)
+	V.Local.sLot.Set(V.Screen.FormPartAlloc!txtLot.Text)
+
+	F.Intrinsic.Control.If(V.Local.sPart.Trim,<>,"")
+		F.Intrinsic.Control.If(V.Local.sLot.Trim,<>,"")
+			F.Intrinsic.String.Build("Part = '{0}' and {2} = '{1}'",V.Local.sPart.Trim,V.Local.sLot.Trim,V.Global.sAlloc,V.Local.sFilter)
+		F.Intrinsic.Control.Else
+			F.Intrinsic.String.Build("Part = '{0}'",V.Local.sPart.Trim,V.Local.sFilter)
+		F.Intrinsic.Control.EndIf
+	F.Intrinsic.Control.Else
+		F.Intrinsic.Control.If(V.Local.sLot.Trim,<>,"")
+			F.Intrinsic.String.Build("{1} = '{0}'",V.Local.sLot.Trim,V.Global.sAlloc,V.Local.sFilter)
+		F.Intrinsic.Control.Else
+			V.Local.sFilter.Set("")
+		F.Intrinsic.Control.EndIf
+	F.Intrinsic.Control.EndIf
+	
+	F.Data.DataView.SetFilter("ItemMaster","VItemMaster",V.Local.sFilter)
+	
+	F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.String.Build("Project: {1}{0}Subroutine: {2} Error: {3} with Description {4}","LK_PART_ALLOCATION_MOCKUP.g2u", v.Ambient.CurrentSubroutine, v.Ambient.ErrorNumber, v.Ambient.ErrorDescription, v.Local.sError)
+	F.Intrinsic.UI.Msgbox(v.Local.sError)
+	F.Intrinsic.Control.CallSub(FormPartAlloc_UnLoad)
+F.Intrinsic.Control.EndTry
+
+Program.Sub.txtPart_LostFocus_Filter_Grid.End
+
+'FILTERS THE MOMENT THE LOT TEXT BOX LOOSES FOCUS
+Program.Sub.txtLot_LostFocus_Filter_Grid.Start
+F.Intrinsic.Control.Try
+	V.Local.sError.Declare(String,"")
+	V.Local.sFilter.Declare(String,"")
+	V.Local.sPart.Declare(String,"")
+	V.Local.sLot.Declare(String,"")
+	
+	V.Local.sPart.Set(V.Screen.FormPartAlloc!txtPart.Text)
+	V.Local.sLot.Set(V.Screen.FormPartAlloc!txtLot.Text)
+	
+	F.Intrinsic.Control.If(V.Local.sPart.Trim,<>,"")
+		F.Intrinsic.Control.If(V.Local.sLot.Trim,<>,"")
+			F.Intrinsic.String.Build("Part = '{0}' and {2} = '{1}'",V.Local.sPart.Trim,V.Local.sLot.Trim,V.Global.sAlloc,V.Local.sFilter)
+		F.Intrinsic.Control.Else
+			F.Intrinsic.String.Build("Part = '{0}'",V.Local.sPart.Trim,V.Local.sFilter)
+		F.Intrinsic.Control.EndIf
+	F.Intrinsic.Control.Else
+		F.Intrinsic.Control.If(V.Local.sLot.Trim,<>,"")
+			F.Intrinsic.String.Build("{1} = '{0}'",V.Local.sLot.Trim,V.Global.sAlloc,V.Local.sFilter)
+		F.Intrinsic.Control.Else
+			V.Local.sFilter.Set("")
+		F.Intrinsic.Control.EndIf
+	F.Intrinsic.Control.EndIf
+	
+	F.Data.DataView.SetFilter("ItemMaster","VItemMaster",V.Local.sFilter)
+	
+	F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.String.Build("Project: {1}{0}Subroutine: {2} Error: {3} with Description {4}","LK_PART_ALLOCATION_MOCKUP.g2u", v.Ambient.CurrentSubroutine, v.Ambient.ErrorNumber, v.Ambient.ErrorDescription, v.Local.sError)
+	F.Intrinsic.UI.Msgbox(v.Local.sError)
+	F.Intrinsic.Control.CallSub(FormPartAlloc_UnLoad)
+F.Intrinsic.Control.EndTry
+
+Program.Sub.txtLot_LostFocus_Filter_Grid.End
+
+'SETS THE GRID PROPERTIES
+Program.Sub.Set_Properities.Start
+F.Intrinsic.Control.Try
+	V.Local.sError.Declare(String,"")
+'	V.Local.sDropDown.Declare(String,"")
+'	
+'	V.Local.sDropDown.Set("*!*Sales Order*!*Work Order*!*User*!*Customer")
+	
+	Gui.FormPartAlloc.GsGridControlPartAlloc.AddGridviewFromDataview("ItemMasterGrid","ItemMaster","VItemMaster")
+	Gui.FormPartAlloc.GsGridControlPartAlloc.SetGridviewProperty("ItemMasterGrid","Multiselect",False)
+	Gui.FormPartAlloc.GsGridControlPartAlloc.SetGridviewProperty("ItemMasterGrid","OptionsSelectionEnableAppearanceFocusedRow",False)
+	Gui.FormPartAlloc.GsGridControlPartAlloc.SetGridviewProperty("ItemMasterGrid","OptionsViewShowAutoFilterRow",True)
+	
+'	Gui.FormPartAlloc.GsGridControlPartAlloc.ColumnEdit("ItemMasterGrid","Allocation","Dropdownlist",V.Local.sDropDown)
+	Gui.FormPartAlloc.GsGridControlPartAlloc.SetColumnProperty("ItemMasterGrid","Allocation","ReadOnly",True)
+	Gui.FormPartAlloc.GsGridControlPartAlloc.SetColumnProperty("ItemMasterGrid","Allocation","AllowEdit",False)
+	Gui.FormPartAlloc.GsGridControlPartAlloc.SetColumnProperty("ItemMasterGrid","Alloc_Type","Visible",False)
+	Gui.FormPartAlloc.GsGridControlPartAlloc.SetColumnProperty("ItemMasterGrid","Allocation_Value","ReadOnly",True)
+	Gui.FormPartAlloc.GsGridControlPartAlloc.SetColumnProperty("ItemMasterGrid","Allocation_Value","AllowEdit",False)
+	Gui.FormPartAlloc.GsGridControlPartAlloc.SetColumnProperty("ItemMasterGrid","Allocation_Value","Caption","Allocation Value")
+	Gui.FormPartAlloc.GsGridControlPartAlloc.SetColumnProperty("ItemMasterGrid","Allocation_Qty","ReadOnly",False)
+	Gui.FormPartAlloc.GsGridControlPartAlloc.SetColumnProperty("ItemMasterGrid","Allocation_Qty","AllowEdit",True)
+	Gui.FormPartAlloc.GsGridControlPartAlloc.SetColumnProperty("ItemMasterGrid","Allocation_Qty","Caption","Allocation Qty")
+	
+	Gui.FormPartAlloc.GsGridControlPartAlloc.SetColumnProperty("ItemMasterGrid","Part","ReadOnly",True)
+	Gui.FormPartAlloc.GsGridControlPartAlloc.SetColumnProperty("ItemMasterGrid","Part","AllowEdit",False)
+	Gui.FormPartAlloc.GsGridControlPartAlloc.SetColumnProperty("ItemMasterGrid","Lot","ReadOnly",True)
+	Gui.FormPartAlloc.GsGridControlPartAlloc.SetColumnProperty("ItemMasterGrid","Lot","AllowEdit",False)
+	Gui.FormPartAlloc.GsGridControlPartAlloc.SetColumnProperty("ItemMasterGrid","Bin","ReadOnly",True)
+	Gui.FormPartAlloc.GsGridControlPartAlloc.SetColumnProperty("ItemMasterGrid","Bin","AllowEdit",False)
+	Gui.FormPartAlloc.GsGridControlPartAlloc.SetColumnProperty("ItemMasterGrid","Heat","ReadOnly",True)
+	Gui.FormPartAlloc.GsGridControlPartAlloc.SetColumnProperty("ItemMasterGrid","Heat","AllowEdit",False)
+	Gui.FormPartAlloc.GsGridControlPartAlloc.SetColumnProperty("ItemMasterGrid","Serial_Number","ReadOnly",True)
+	Gui.FormPartAlloc.GsGridControlPartAlloc.SetColumnProperty("ItemMasterGrid","Serial_Number","AllowEdit",False)
+	Gui.FormPartAlloc.GsGridControlPartAlloc.SetColumnProperty("ItemMasterGrid","Serial_Number","Caption","Serial")
+	
+	Gui.FormPartAlloc.GsGridControlPartAlloc.SetColumnProperty("ItemMasterGrid","Part","HeaderBackColor","Green")
+	Gui.FormPartAlloc.GsGridControlPartAlloc.SetColumnProperty("ItemMasterGrid","Lot","HeaderBackColor","Green")
+	Gui.FormPartAlloc.GsGridControlPartAlloc.SetColumnProperty("ItemMasterGrid","Bin","HeaderBackColor","Green")
+	Gui.FormPartAlloc.GsGridControlPartAlloc.SetColumnProperty("ItemMasterGrid","Heat","HeaderBackColor","Green")
+	Gui.FormPartAlloc.GsGridControlPartAlloc.SetColumnProperty("ItemMasterGrid","Serial_Number","HeaderBackColor","Green")
+	Gui.FormPartAlloc.GsGridControlPartAlloc.SetColumnProperty("ItemMasterGrid","Quantity","HeaderBackColor","Green")
+	Gui.FormPartAlloc.GsGridControlPartAlloc.SetColumnProperty("ItemMasterGrid","Allocated","HeaderBackColor","Green")
+	Gui.FormPartAlloc.GsGridControlPartAlloc.SetColumnProperty("ItemMasterGrid","Alloc_Type","HeaderBackColor","Green")
+	Gui.FormPartAlloc.GsGridControlPartAlloc.SetColumnProperty("ItemMasterGrid","Allocation","HeaderBackColor","Green")
+	Gui.FormPartAlloc.GsGridControlPartAlloc.SetColumnProperty("ItemMasterGrid","Allocation_Value","HeaderBackColor","Green")
+	Gui.FormPartAlloc.GsGridControlPartAlloc.SetColumnProperty("ItemMasterGrid","Allocation_Qty","HeaderBackColor","Green")
+	
+	Gui.FormPartAlloc.GsGridControlPartAlloc.SetColumnProperty("ItemMasterGrid","Part","HeaderForeColor","White")
+	Gui.FormPartAlloc.GsGridControlPartAlloc.SetColumnProperty("ItemMasterGrid","Lot","HeaderForeColor","White")
+	Gui.FormPartAlloc.GsGridControlPartAlloc.SetColumnProperty("ItemMasterGrid","Bin","HeaderForeColor","White")
+	Gui.FormPartAlloc.GsGridControlPartAlloc.SetColumnProperty("ItemMasterGrid","Heat","HeaderForeColor","White")
+	Gui.FormPartAlloc.GsGridControlPartAlloc.SetColumnProperty("ItemMasterGrid","Serial_Number","HeaderForeColor","White")
+	Gui.FormPartAlloc.GsGridControlPartAlloc.SetColumnProperty("ItemMasterGrid","Quantity","HeaderForeColor","White")
+	Gui.FormPartAlloc.GsGridControlPartAlloc.SetColumnProperty("ItemMasterGrid","Allocated","HeaderForeColor","White")
+	Gui.FormPartAlloc.GsGridControlPartAlloc.SetColumnProperty("ItemMasterGrid","Alloc_Type","HeaderForeColor","White")
+	Gui.FormPartAlloc.GsGridControlPartAlloc.SetColumnProperty("ItemMasterGrid","Allocation","HeaderForeColor","White")
+	Gui.FormPartAlloc.GsGridControlPartAlloc.SetColumnProperty("ItemMasterGrid","Allocation_Value","HeaderForeColor","White")
+	Gui.FormPartAlloc.GsGridControlPartAlloc.SetColumnProperty("ItemMasterGrid","Allocation_Qty","HeaderForeColor","White")
+	
+	Gui.FormPartAlloc.GsGridControlPartAlloc.MainView("ItemMasterGrid")
+	
+	F.Intrinsic.Control.ExitSub
+	
+F.Intrinsic.Control.Catch
+	F.Intrinsic.String.Build("Project: {1}{0}Subroutine: {2} Error: {3} with Description {4}","LK_PART_ALLOCATION_MOCKUP.g2u", v.Ambient.CurrentSubroutine, v.Ambient.ErrorNumber, v.Ambient.ErrorDescription, v.Local.sError)
+	F.Intrinsic.UI.Msgbox(v.Local.sError)
+	F.Intrinsic.Control.CallSub(FormPartAlloc_UnLoad)
+F.Intrinsic.Control.EndTry
+
+Program.Sub.Set_Properities.End
+
+'SEARCH BROWSER
+Program.Sub.cmdSearch_Click.Start
+F.Intrinsic.Control.Try
+	V.Local.sError.Declare(String,"")
+	v.Local.sTitles.Declare(String,"")
+	v.Local.iWidths.Declare(Long,0)
+	v.Local.sRet.Declare(String,"")
+	V.Local.sSplitRet.Declare(String,"")
+	
+	'CREATING BROWSER
+	F.Intrinsic.String.Build("Part*!*{0}",V.Global.sAlloc,V.Local.sRet)
+	F.Intrinsic.String.Split(V.Local.sRet,"*!*", v.Local.sTitles)
+	F.Intrinsic.String.Split("1000*!*1000","*!*", v.Local.iWidths)
+	
+	'PULLING INFORMATION FROM THE DATABASE AND DISPLAYING IN THE BROWSER, FINALLY RETRIEVING THE VALUES
+	F.Intrinsic.String.Build("Select PART, {0} from V_ITEM_MASTER",V.Global.sAlloc,V.Local.sRet)
+	F.Intrinsic.UI.Browser("Part Browser", "Con",V.Local.sRet, v.Local.sTitles, v.Local.iWidths, v.Local.sRet)
+	F.Intrinsic.String.Split(v.Local.sRet,"*!*",V.Local.sSplitRet)
+	gui.FormPartAlloc.txtPart.Text(V.Local.sSplitRet(0))
+	Gui.FormPartAlloc.txtLot.Text(V.Local.sSplitRet(1))
+	
+	f.Intrinsic.Control.ExitSub
+	
+F.Intrinsic.Control.Catch
+	F.Intrinsic.String.Build("Project: {1}{0}Subroutine: {2} Error: {3} with Description {4}","LK_PART_ALLOCATION_MOCKUP.g2u", v.Ambient.CurrentSubroutine, v.Ambient.ErrorNumber, v.Ambient.ErrorDescription, v.Local.sError)
+	F.Intrinsic.UI.Msgbox(v.Local.sError)
+	F.Intrinsic.Control.CallSub(FormPartAlloc_UnLoad)
+F.Intrinsic.Control.EndTry	
+
+
+Program.Sub.cmdSearch_Click.End
+
+'SUBROUTINE TO ALLOCATE FROM THE GRID
+Program.Sub.cmdAllocate_Click.Start
+F.Intrinsic.Control.Try
+	V.Local.sError.Declare(String,"")
+	v.Local.sPart.Declare(String,"")
+	v.Local.sRev.Declare(String,"")
+	v.Local.sParams.Declare(String,"")
+	v.Local.iIndex.Declare(Long,0)
+	V.Local.iLength.Declare(Long,0)
+	v.Local.sQuery.Declare(String,"")
+	V.Local.sQueryRet.Declare(String,"")
+	V.Local.sAllocationvalue.Declare(String,"")
+	
+	f.Intrinsic.Control.For(v.Local.iIndex,0, v.DataView.ItemMaster!VItemMaster.RowCount--,1)
+	
+		'FORMATTING PART BY SPLITTING THE PART INTO THE FIRST 17 CHARACTERS AND REV INTO THE LAST 3
+		f.Intrinsic.String.Len(v.DataView.ItemMaster!VItemMaster(v.Local.iIndex).Part!FieldVal, v.Local.iLength)
+		
+		F.Intrinsic.Control.If(v.Local.iLength,"<",20)
+			F.Intrinsic.String.RPad(v.DataView.ItemMaster!VItemMaster(v.Local.iIndex).Part!FieldVal," ",20,v.Local.sPart)
+			F.Intrinsic.String.Left(v.Local.sPart,17,v.Local.sPart)
+			F.Intrinsic.String.Right(v.Local.sPart,3,v.Local.sRev)
+		f.Intrinsic.Control.Else
+			F.Intrinsic.String.Left(v.DataView.ItemMaster!VItemMaster(v.Local.iIndex).Part!FieldVal,17,v.Local.sPart)
+			F.Intrinsic.String.Right(v.DataView.ItemMaster!VItemMaster(v.Local.iIndex).Part!FieldVal,3,v.Local.sRev)
+		F.Intrinsic.Control.EndIf
+		
+		'MAKING SURE THEY HAVEN'T BEEN ALLOCATED FIRST AND THAT THEIR IS ENOUGH AVAILABLE QUANTITY BEFORE ALLOCATING
+		F.Intrinsic.Control.If(v.DataView.ItemMaster!VItemMaster(v.Local.iIndex).Allocated!FieldValtrim,"=","")
+		F.Intrinsic.Control.AndIf(v.DataView.ItemMaster!VItemMaster(v.Local.iIndex).Quantity!FieldVal,">=",v.DataView.ItemMaster!VItemMaster(v.Local.iIndex).Allocation_Qty!FieldVal)
+			'PART ALLOCATION CALLWRAPPERS DEPENDING IF  YOU'RE ALLOCATING TO USER, CUSTOMER, WORK ORDER, OR SALES ORDER
+			f.Intrinsic.Control.SelectCase(V.DataView.ItemMaster!VItemMaster(V.Local.iIndex).Allocation!FieldVal)	
+				F.Intrinsic.Control.Case("Customer")
+				 
+				    F.Global.Callwrapper.New("Cust","Inventory.PartAutoAllocationCustomer")
+				    F.Global.Callwrapper.SetProperty("Cust","Part",V.Local.sPart)
+				    F.Global.Callwrapper.SetProperty("Cust","Revision",V.Local.sRev)
+				    F.Global.Callwrapper.SetProperty("Cust","Location"," ")
+				    F.Global.Callwrapper.SetProperty("Cust","OrderQuantity",v.DataView.ItemMaster!VItemMaster(v.Local.iIndex).Allocation_Qty!FieldVal)
+				    F.Global.Callwrapper.SetProperty("Cust","CustomerNumber",v.Global.sCustomerRet(0))
+				    F.Global.Callwrapper.SetProperty("Cust","Lot",v.DataView.ItemMaster!VItemMaster(v.Local.iIndex).Lot!FieldVal)
+				    F.Global.Callwrapper.SetProperty("Cust","Bin",v.DataView.ItemMaster!VItemMaster(v.Local.iIndex).Bin!FieldVal)
+				    F.Global.Callwrapper.SetProperty("Cust","Heat",v.DataView.ItemMaster!VItemMaster(v.Local.iIndex).Heat!FieldVal)
+				    F.Global.Callwrapper.SetProperty("Cust","Serial",V.DataView.ItemMaster!VItemMaster(v.Local.iIndex).Serial_Number!FieldVal)
+				    F.Global.CallWrapper.Run("Cust")
+				
+	
+				F.Intrinsic.Control.Case("Work Order")
+		
+					f.Intrinsic.String.Split(v.DataView.ItemMaster!VItemMaster(v.Local.iIndex).Allocation_Value!Fieldval,"-",v.Local.sAllocationvalue)
+				   ' Part 0) Rev 1) Locn 2) Lot 3) Bin 4) Heat 5) Serial 6) Qty 7) Job 8) Suffix 9) Seq 10
+				   F.Intrinsic.String.Build("{0}!*!{1}!*! !*!{2}!*!{3}!*!{4}!*!{5}!*!{6}!*!{7}!*!{8}!*!{9}",v.Local.sPart, v.local.sRev,v.DataView.ItemMaster!VItemMaster(v.Local.iIndex).Lot!FieldVal,v.DataView.ItemMaster!VItemMaster(v.Local.iIndex).Bin!FieldVal,v.DataView.ItemMaster!VItemMaster(v.Local.iIndex).Heat!FieldVal,V.DataView.ItemMaster!VItemMaster(v.Local.iIndex).Serial_Number!FieldVal,v.DataView.ItemMaster!VItemMaster(v.Local.iIndex).Allocation_Qty!FieldVal,v.Local.sAllocationvalue(0),v.Local.sAllocationvalue(1),v.Local.sAllocationvalue(2),V.Local.sParams)
+			
+				   F.Global.General.CallWrapperSync(7103,V.Local.sParams)
+		
+				      
+				F.Intrinsic.Control.Case("Sales Order")
+				
+					f.Intrinsic.String.Split(v.DataView.ItemMaster!VItemMaster(v.Local.iIndex).Allocation_Value!Fieldval,"-",v.Local.sAllocationvalue)
+				   ' Type=R FOR SCREENLESS 0) Part 1) Rev 2) Locn 3) Qty 4) Order 5) Order Line 6) Lot 7) Bin 8) Heat 9) Serial 10
+				    F.Intrinsic.String.Build("R!*!{0}!*!{1}!*! !*!{2}!*!{3}!*!{4}!*!{5}!*!{6}!*!{7}!*!{8}!*!{9}",v.Local.sPart, v.Local.sRev,v.DataView.ItemMaster!VItemMaster(v.Local.iIndex).Allocation_Qty!FieldVal, v.Local.sAllocationvalue(0), v.Local.sAllocationvalue(1), v.DataView.ItemMaster!VItemMaster(v.Local.iIndex).Lot!FieldVal, v.DataView.ItemMaster!VItemMaster(v.Local.iIndex).Bin!FieldVal,v.DataView.ItemMaster!VItemMaster(v.Local.iIndex).Heat!FieldVal,V.DataView.ItemMaster!VItemMaster(v.Local.iIndex).Serial_Number!FieldVal,V.Local.sParams)
+				   F.Global.General.CallWrapperSync(7100,V.Local.sParams)
+				   
+				F.Intrinsic.Control.Case("User")
+		
+					  ' Part 0) Rev 1) Locn 2) Lot 3) Bin 4) Heat 5) Serial 6) Qty 7) User 8
+					 F.Intrinsic.String.Build("{0}!*!{1}!*! !*!{2}!*!{3}!*!{4}!*!{5}!*!{6}!*!{7}",V.Local.sPart, v.local.sRev,v.DataView.ItemMaster!VItemMaster(v.Local.iIndex).Lot!FieldVal, v.DataView.ItemMaster!VItemMaster(v.Local.iIndex).Bin!FieldVal,v.DataView.ItemMaster!VItemMaster(v.Local.iIndex).Heat!FieldVal,V.DataView.ItemMaster!VItemMaster(v.Local.iIndex).Serial_Number!FieldVal,v.DataView.ItemMaster!VItemMaster(v.Local.iIndex).Allocation_Qty!FieldVal, v.Caller.User ,v.Local.sParams)
+					 F.Global.General.CallWrapperSync(7102,V.Local.sParams)  
+				 
+			F.Intrinsic.Control.EndSelect
+			
+		F.Intrinsic.Control.Else
+			F.Intrinsic.Control.If(v.DataView.ItemMaster!VItemMaster(v.Local.iIndex).Quantity!FieldVal,"<=",v.DataView.ItemMaster!VItemMaster(v.Local.iIndex).Allocation_Qty!FieldVal)
+			F.Intrinsic.Control.AndIf(v.DataView.ItemMaster!VItemMaster(v.Local.iIndex).Allocated!FieldValtrim,"!=","Y")
+				F.Intrinsic.UI.Msgbox("Quantity allocated is greater than Quantity Available")	
+			F.Intrinsic.Control.EndIf
+		F.Intrinsic.Control.EndIf	
+		
+	f.Intrinsic.Control.Next(v.Local.iIndex)
+	
+	'CHECKING IF THE DATATABLE EXISTS AND IF IT DOES CLOSES THEM
+	F.Intrinsic.Control.If(V.DataTable.ItemMaster.Exists)
+		F.Data.DataView.Close("ItemMaster","VItemMaster")
+		F.Data.DataTable.Close("ItemMaster")
+	F.Intrinsic.Control.EndIf
+	
+	'CREATES THE DATATABLE AND DATAVIEW FROM THE SQL QUERY
+	F.Data.DataTable.CreateFromSQL("ItemMaster","con","Select rtrim(Part) as Part, rtrim(Lot) as Lot, Bin, Heat, Serial_Number, Quantity, Allocated, Alloc_Type, If(Alloc_Type = 'U','User',If(Alloc_Type = 'S','Sales Order',IF(Alloc_Type = 'W','Work Order',IF(Alloc_Type = 'C','Customer','')))) as Allocation, Heat as Allocation_Value, If(Allocated = 'Y',Quantity,0) as Allocation_Qty From V_Item_Master Where Quantity > 0 and Alloc_Type <> 'T' Order By Part,Lot",True)
+	F.Data.DataView.Create("ItemMaster","VItemMaster")
+	
+	'REFRESHES THE GRID CONTROL TO DISPLAY THE NEW PROPERTIES
+	gui.FormPartAlloc.GsGridControlPartAlloc.SuspendLayout
+	F.Intrinsic.Control.CallSub(Set_Properities)
+	gui.FormPartAlloc.GsGridControlPartAlloc.ResumeLayout
+	 
+	F.Intrinsic.Control.ExitSub
+	
+F.Intrinsic.Control.Catch
+	F.Intrinsic.String.Build("Project: {1}{0}Subroutine: {2} Error: {3} with Description {4}","LK_PART_ALLOCATION_MOCKUP.g2u", v.Ambient.CurrentSubroutine, v.Ambient.ErrorNumber, v.Ambient.ErrorDescription, v.Local.sError)
+	F.Intrinsic.UI.Msgbox(v.Local.sError)
+	F.Intrinsic.Control.CallSub(FormPartAlloc_UnLoad)
+F.Intrinsic.Control.EndTry
+Program.Sub.cmdAllocate_Click.End
+
+'ALLOWS USERS TO OPEN UP A BROWSER ON THE ALLOCATION VALUE COLUMN DEPENDING IF CASE IS A CUSTOMER, USER, WORK ORDER, OR SALES ORDER 
+Program.Sub.GsGridControlPartAlloc_RowCellClick.Start
+F.Intrinsic.Control.Try
+	V.Local.sError.Declare(String,"")
+	V.Local.sRet.Declare(String,"")
+	v.Local.sTitles.Declare(String,"")
+	v.Local.iWidths.Declare(Long,0)
+	v.Global.sCustomerRet.Declare(String,"")
+	V.Local.iIndex.Declare(Long,0)
+	v.Local.sUnallocation.Declare(String,"")
+	V.Local.sMsgBoxRet.Declare(String,"")
+	V.Local.iLength.Declare(Long,0)
+	V.Local.sPart.Declare(String,"")
+	V.Local.sRev.Declare(String,"")
+	v.Local.sFile.Declare(String,"")
+	V.Local.sDropDown.Declare(String,"")
+	V.Local.iCol.Declare(Long,0)
+	V.Local.sSql.Declare(String,"")
+	
+	'FORMATTING PART BY SPLITTING THE PART INTO THE FIRST 17 CHARACTERS AND REV INTO THE LAST 3
+		f.Intrinsic.String.Len(V.DataTable.ItemMaster(V.Args.ROWINDEX).Part!FieldVal, v.Local.iLength)
+		
+		F.Intrinsic.Control.If(v.Local.iLength,"<",20)
+			F.Intrinsic.String.RPad(V.DataTable.ItemMaster(V.Args.ROWINDEX).Part!FieldVal," ",20,v.Local.sPart)
+			F.Intrinsic.String.Left(v.Local.sPart,17,v.Local.sPart)
+			F.Intrinsic.String.Right(v.Local.sPart,3,v.Local.sRev)
+		f.Intrinsic.Control.Else
+			F.Intrinsic.String.Left(V.DataTable.ItemMaster(V.Args.ROWINDEX).Part!FieldVal,17,v.Local.sPart)
+			F.Intrinsic.String.Right(V.DataTable.ItemMaster(V.Args.ROWINDEX).Part!FieldVal,3,v.Local.sRev)
+		F.Intrinsic.Control.EndIf
+	
+	'Allows user to set a value in the allocation field
+	F.Intrinsic.Control.If(V.Args.Column,=,"Allocation_Value")
+		F.Intrinsic.Control.If(V.Args.Button,=,"Left")
+			Gui.FormPartAlloc.GsGridControlPartAlloc.GetColumnIndexByName("ItemMasterGrid","Allocation_Qty",V.Local.iCol)
+			f.Intrinsic.Control.SelectCase(V.DataTable.ItemMaster(V.Args.ROWINDEX).Allocation!FieldVal)
+			
+				F.Intrinsic.Control.Case("Customer")
+			
+					F.Intrinsic.UI.Browser(205,"", v.Global.sCustomerRet)
+					F.Intrinsic.String.Split(v.Global.sCustomerRet,"*!*", v.Global.sCustomerRet)
+					
+					F.Intrinsic.Control.If(v.Global.sCustomerRet,=,"***CANCEL***")
+					F.Intrinsic.Control.Else
+'						gui.FormPartAlloc.GsGridControlPartAlloc.SetCellValue("ItemMasterGrid",9,V.Args.ROWINDEX,v.Global.sCustomerRet(1))
+						Gui.FormPartAlloc.GsGridControlPartAlloc.SetCellValueByColumnName("ItemMasterGrid","Allocation_Value",V.Args.RowIndex,v.Global.sCustomerRet(0))
+						Gui.FormPartAlloc.GsGridControlPartAlloc.SetCellValueByColumnName("ItemMasterGrid","Allocation_Qty",V.Args.RowIndex,"0.000000")
+
+					F.Intrinsic.Control.EndIf
+				
+					Gui.FormPartAlloc.GsGridControlPartAlloc.FocusCell("ItemMasterGrid",V.Args.RowIndex,V.Local.iCol)
+					
+				F.Intrinsic.Control.Case("Work Order")
+				
+					F.Intrinsic.String.Split("Job*!*Suffix*!*Sequence*!*Part*!*Qty Remaining","*!*",v.Local.sTitles)
+					F.Intrinsic.String.Split("1000*!*1000*!*1000*!*1000*!*1000","*!*", v.Local.iWidths)
+					F.Intrinsic.String.Build("Select JOB, SUFFIX, SEQ, PART, (Hours_Estimated - Hours_Actual) as Qty_Remaining from V_JOB_OPERATIONS Where Part = '{0}'",V.Local.sPart,V.Local.sSql)
+					F.Intrinsic.UI.Browser("Work order Browser", "Con",V.Local.sSql, V.Local.sTitles, v.Local.iWidths, v.Local.sRet)
+					
+					F.Intrinsic.String.Split(v.Local.sRet,"*!*",V.Local.sRet)
+					
+					F.Intrinsic.Control.If(v.Local.sRet,=,"***CANCEL***")
+					F.Intrinsic.Control.Else
+						F.Intrinsic.String.Build("{0}-{1}-{2}",v.Local.sRet(0), v.Local.sRet(1), v.Local.sRet(2), v.Local.sRet)
+'						gui.FormPartAlloc.GsGridControlPartAlloc.SetCellValue("ItemMasterGrid",9,V.Args.ROWINDEX,v.Local.sRet)
+						Gui.FormPartAlloc.GsGridControlPartAlloc.SetCellValueByColumnName("ItemMasterGrid","Allocation_Value",V.Args.RowIndex,v.Local.sRet)
+						Gui.FormPartAlloc.GsGridControlPartAlloc.SetCellValueByColumnName("ItemMasterGrid","Allocation_Qty",V.Args.RowIndex,"0.000000")
+					F.Intrinsic.Control.EndIf
+					
+					Gui.FormPartAlloc.GsGridControlPartAlloc.FocusCell("ItemMasterGrid",V.Args.RowIndex,V.Local.iCol)
+					
+				F.Intrinsic.Control.Case("Sales Order")
+					
+					F.Intrinsic.String.Split("Order No*!*Record No*!*Customer*!*Part*!*Qty BO","*!*", v.Local.sTitles)
+					F.Intrinsic.String.Split("1000*!*1000*!*1000*!*1000*!*1000", "*!*", v.Local.iWidths)
+					
+					F.Intrinsic.String.Build("Select ORDER_NO, RECORD_NO, CUSTOMER, PART, QTY_BO from V_ORDER_LINES Where Part = '{0}'",v.Local.sPart,V.Local.sSql)
+					F.Intrinsic.UI.Browser("Sales order Browser", "Con",V.Local.sSql, V.Local.sTitles, v.Local.iWidths, v.Local.sRet)
+					
+					F.Intrinsic.String.Split(V.Local.sRet,"*!*", V.Local.sRet)
+					
+					F.Intrinsic.Control.If(v.Local.sRet,=,"***CANCEL***")
+					F.Intrinsic.Control.Else
+						F.Intrinsic.String.Left(v.Local.sRet(1),3,v.Local.sRet(1))
+						F.Intrinsic.String.Build("{0}-{1}", v.Local.sRet(0),v.Local.sRet(1), v.Local.sRet)
+'						gui.FormPartAlloc.GsGridControlPartAlloc.SetCellValue("ItemMasterGrid",9,V.Args.ROWINDEX,v.Local.sRet)
+						Gui.FormPartAlloc.GsGridControlPartAlloc.SetCellValueByColumnName("ItemMasterGrid","Allocation_Value",V.Args.RowIndex,v.Local.sRet)
+						Gui.FormPartAlloc.GsGridControlPartAlloc.SetCellValueByColumnName("ItemMasterGrid","Allocation_Qty",V.Args.RowIndex,"0.000000")
+					F.Intrinsic.Control.EndIf
+					
+					Gui.FormPartAlloc.GsGridControlPartAlloc.FocusCell("ItemMasterGrid",V.Args.RowIndex,V.Local.iCol)
+					
+				F.Intrinsic.Control.Case("User")
+				
+					F.Intrinsic.UI.Browser(10,"", v.Local.sRet)
+					F.Intrinsic.Control.If(v.Local.sRet,=,"***CANCEL***")
+					F.Intrinsic.Control.Else
+						F.Intrinsic.String.Split(v.Local.sRet,"*!*",v.Local.sRet)
+'						gui.FormPartAlloc.GsGridControlPartAlloc.SetCellValue("ItemMasterGrid",9,V.Args.ROWINDEX,v.Local.sRet(1))
+						Gui.FormPartAlloc.GsGridControlPartAlloc.SetCellValueByColumnName("ItemMasterGrid","Allocation_Value",V.Args.RowIndex,v.Local.sRet(1))
+						Gui.FormPartAlloc.GsGridControlPartAlloc.SetCellValueByColumnName("ItemMasterGrid","Allocation_Qty",V.Args.RowIndex,"0.000000")
+
+					F.Intrinsic.Control.EndIf
+					
+					Gui.FormPartAlloc.GsGridControlPartAlloc.FocusCell("ItemMasterGrid",V.Args.RowIndex,V.Local.iCol)
+					
+			f.Intrinsic.Control.EndSelect
+		F.Intrinsic.Control.EndIf
+	
+	F.Intrinsic.Control.Else
+		F.Intrinsic.Control.If(V.Args.Button,=,"Left")
+			F.Intrinsic.Control.If(V.Args.Column,=,"Allocation")
+				Gui.FormPartAlloc.GsGridControlPartAlloc.GetCellValueByColumnName("ItemMasterGrid","Allocated",V.Args.RowIndex,V.Local.sRet)
+				F.Intrinsic.Control.If(V.Local.sRet,<>,"Y")
+					V.Local.sDropDown.Set("*!*Sales Order*!*Work Order*!*User*!*Customer")
+					
+					F.Intrinsic.UI.BrowserFromString("Allocation",V.Local.sDropDown,",","*!*","Allocation",2000,V.Local.sRet)
+					
+					F.Intrinsic.Control.If(V.Local.sRet,<>,"***CANCEL***")
+						F.Intrinsic.Control.If(V.Local.sRet.Trim,=,"")
+							Gui.FormPartAlloc.GsGridControlPartAlloc.SetCellValueByColumnName("ItemMasterGrid","Allocation",V.Args.RowIndex,V.Local.sRet)
+							Gui.FormPartAlloc.GsGridControlPartAlloc.SetCellValueByColumnName("ItemMasterGrid","Allocation_Qty",V.Args.RowIndex,"0.000000")
+							Gui.FormPartAlloc.GsGridControlPartAlloc.SetCellValueByColumnName("ItemMasterGrid","Allocation_Value",V.Args.RowIndex,"")
+						F.Intrinsic.Control.Else
+							Gui.FormPartAlloc.GsGridControlPartAlloc.SetCellValueByColumnName("ItemMasterGrid","Allocation",V.Args.RowIndex,V.Local.sRet)
+							Gui.FormPartAlloc.GsGridControlPartAlloc.SetCellValueByColumnName("ItemMasterGrid","Allocation_Value",V.Args.RowIndex,"")
+						F.Intrinsic.Control.EndIf
+					F.Intrinsic.Control.EndIf
+				F.Intrinsic.Control.EndIf
+			F.Intrinsic.Control.EndIf
+		F.Intrinsic.Control.EndIf
+	F.Intrinsic.Control.EndIf
+	
+	'Starts the unallocation process when the user right clicks and selects yes
+	F.Intrinsic.Control.If(V.Args.Button,=,"Right")	
+	
+		Gui.FormPartAlloc.GsGridControlPartAlloc.GetCellValueByColumnName("ItemMasterGrid","Allocated",V.Args.RowIndex,V.Local.sRet)
+		F.Intrinsic.Control.If(V.Local.sRet.Trim,=,"Y")
+			F.Intrinsic.UI.Msgbox("Do you wish to unallocate this part?","Unallocate", 4, v.Local.sMsgBoxRet)
+		F.Intrinsic.Control.Else
+			V.Local.sMsgBoxRet.Set("7")
+		F.Intrinsic.Control.EndIf
+		
+		F.Intrinsic.Control.If(v.Local.sMsgBoxRet,=,6)
+			'F.Intrinsic.UI.Msgbox(v.DataView.ItemMaster!VItemMaster(V.Args.ROWINDEX).Part!FieldVal)
+			
+			F.Intrinsic.String.Build("{0}{1}{2}Parts.txt",V.Caller.LocalGSSTempDir, v.System.UserName ,V.Caller.CompanyCode,V.Local.sFile)
+			
+			F.Intrinsic.String.Build("{0}*!*{1}*!*{2}*!*{3}*!*{4}*!*{5}*!*{6}",V.Local.sPart.Trim,V.Local.sRev.Trim,"", v.DataTable.ItemMaster(V.Args.ROWINDEX).Lot!FieldValTrim, v.DataTable.ItemMaster(V.Args.ROWINDEX).Bin!FieldValTrim, v.DataTable.ItemMaster(V.Args.ROWINDEX).Heat!FieldValTrim, v.DataTable.ItemMaster(V.Args.ROWINDEX).Serial_Number!FieldValTrim, v.Local.sUnallocation)
+			
+			F.Intrinsic.File.String2File(V.Local.sFile,v.Local.sUnallocation)
+	
+			F.Global.Callwrapper.New("Unallocate","Inventory.UnallocatePart")
+			F.Global.Callwrapper.SetProperty("Unallocate","FileName",V.Local.sFile)
+			F.Global.Callwrapper.Run("Unallocate")
+			F.Global.Callwrapper.GetProperty("Unallocate","Status",v.Local.sUnallocation)
+			
+			F.Intrinsic.UI.Msgbox(V.Local.sUnallocation)
+			
+			'CHECKING IF THE DATATABLE EXISTS AND IF IT DOES CLOSES THEM
+			F.Intrinsic.Control.If(V.DataTable.ItemMaster.Exists)
+				F.Data.DataView.Close("ItemMaster","VItemMaster")
+				F.Data.DataTable.Close("ItemMaster")
+			F.Intrinsic.Control.EndIf
+			
+			'CREATES THE DATATABLE AND DATAVIEW FROM THE SQL QUERY
+			F.Data.DataTable.CreateFromSQL("ItemMaster","con","Select rtrim(Part) as Part, rtrim(Lot) as Lot, Bin, Heat, Serial_Number, Quantity, Allocated, Alloc_Type, If(Alloc_Type = 'U','User',If(Alloc_Type = 'S','Sales Order',IF(Alloc_Type = 'W','Work Order',IF(Alloc_Type = 'C','Customer','')))) as Allocation, Heat as Allocation_Value, If(Allocated = 'Y',Quantity,0) as Allocation_Qty From V_Item_Master Where Quantity > 0 and Alloc_Type <> 'T' Order By Part,Lot",True)
+			F.Data.DataView.Create("ItemMaster","VItemMaster")
+			
+			'REFRESHES THE GRID CONTROL TO DISPLAY THE NEW PROPERTIES
+			gui.FormPartAlloc.GsGridControlPartAlloc.SuspendLayout
+			F.Intrinsic.Control.CallSub(Set_Properities)
+			gui.FormPartAlloc.GsGridControlPartAlloc.ResumeLayout
+		
+		F.Intrinsic.Control.EndIf
+				
+	F.Intrinsic.Control.EndIf
+	
+	F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.String.Build("Project: {1}{0}Subroutine: {2} Error: {3} with Description {4}","LK_PART_ALLOCATION_MOCKUP.g2u", v.Ambient.CurrentSubroutine, v.Ambient.ErrorNumber, v.Ambient.ErrorDescription, v.Local.sError)
+	F.Intrinsic.UI.Msgbox(v.Local.sError)
+	F.Intrinsic.Control.CallSub(FormPartAlloc_UnLoad)
+F.Intrinsic.Control.EndTry
+
+Program.Sub.GsGridControlPartAlloc_RowCellClick.End
+
+'EXPORT TO EXCEL
+Program.Sub.cmdExport_Click.Start
+F.Intrinsic.Control.Try
+	V.Local.sError.Declare(String,"")
+	v.Local.sFile.Declare(String,"")
+	
+	F.Intrinsic.String.Build("{0}{1}{2}PartsAllocation.xlsx",V.Caller.LocalGSSTempDir,v.System.UserName,V.Caller.CompanyCode,V.Local.sFile)
+	
+	'EXPORTING GRID TO EXCEL
+	gui.FormPartAlloc.GsGridControlPartAlloc.Export(v.Local.sFile, "xlsx")
+	
+	f.Intrinsic.Task.ShellExec(handle,"open", v.Local.sFile,"","",1)
+	
+	F.Intrinsic.Control.ExitSub
+	
+F.Intrinsic.Control.Catch
+	F.Intrinsic.String.Build("Project: {1}{0}Subroutine: {2} Error: {3} with Description {4}","LK_PART_ALLOCATION_MOCKUP.g2u", v.Ambient.CurrentSubroutine, v.Ambient.ErrorNumber, v.Ambient.ErrorDescription, v.Local.sError)
+	F.Intrinsic.UI.Msgbox(v.Local.sError)
+	F.Intrinsic.Control.CallSub(FormPartAlloc_UnLoad)
+F.Intrinsic.Control.EndTry
+Program.Sub.cmdExport_Click.End
